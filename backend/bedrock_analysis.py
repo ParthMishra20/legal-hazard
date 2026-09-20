@@ -17,6 +17,7 @@ MAX_INPUT_CHARACTERS = 18000
 MAX_OUTPUT_TOKENS = 1200
 
 ALLOWED_LEVELS = {"High", "Medium", "Low"}
+_SEVERITY = {"Low": 0, "Medium": 1, "High": 2}
 
 
 ANALYSIS_INSTRUCTIONS = """You analyze only the document text provided below.
@@ -39,6 +40,7 @@ Use this exact schema:
 
 Rules:
 - overall_risk_level must be exactly High, Medium, or Low.
+- overall_risk_level must be at least as severe as the single riskiest flagged clause. If any clause is High, overall_risk_level must be High.
 - Each flagged clause must quote an exact contiguous clause or sentence from the document.
 - Explain why that specific clause may be unusual, one-sided, costly, restrictive, or otherwise important.
 - Do not invent facts, clauses, laws, rights, or risks not supported by the document.
@@ -115,6 +117,25 @@ def _validate_analysis(result):
             raise ValueError("Each clause needs an explanation")
     return result
 
+
+def _enforce_overall_risk_level(result):
+    clauses = result.get("flagged_clauses", [])
+    if not clauses:
+        return result
+    worst = max(_SEVERITY[c["risk_level"]] for c in clauses)
+    current = _SEVERITY[result["overall_risk_level"]]
+    if worst > current:
+        logger.info(
+            "Overriding overall_risk_level from %s to match worst flagged clause",
+            result["overall_risk_level"],
+        )
+        for level, rank in _SEVERITY.items():
+            if rank == worst:
+                result["overall_risk_level"] = level
+                break
+    return result
+
+
 def _store_result(result):
     import time
     table = dynamodb.Table(TABLE_NAME)
@@ -130,7 +151,7 @@ def lambda_handler(event, context):
         raise ValueError("text must be a non-empty string")
     text = text[:MAX_INPUT_CHARACTERS]
     logger.info("Analyzing document %s with model %s", document_id, MODEL_ID)
-    result = _validate_analysis(_invoke_model(text))
+    result = _enforce_overall_risk_level(_validate_analysis(_invoke_model(text)))
     result["document_id"] = document_id
     result = _store_result(result)
     logger.info("Flagged %d clauses for document %s",
