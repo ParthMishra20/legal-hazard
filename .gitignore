@@ -1,0 +1,17 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+
+# Build/deploy artifacts
+*.zip
+
+# Amplify CLI (not used for this project, but ignored just in case)
+amplify/
+.amplify/
