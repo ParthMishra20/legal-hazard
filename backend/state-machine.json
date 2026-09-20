@@ -1,0 +1,33 @@
+{
+  "Comment": "Legal document processing pipeline: extract text, then analyze risk",
+  "StartAt": "ExtractText",
+  "States": {
+    "ExtractText": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:ap-south-1:992382658971:function:LegalDocumentProcessorTextract",
+      "Next": "AnalyzeRisk",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ]
+    },
+    "AnalyzeRisk": {
+      "Type": "Task",
+      "Resource": "arn:aws:lambda:ap-south-1:992382658971:function:LegalDocumentProcessorBedrock",
+      "InputPath": "$.body",
+      "End": true,
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 2,
+          "BackoffRate": 2.0
+        }
+      ]
+    }
+  }
+}
